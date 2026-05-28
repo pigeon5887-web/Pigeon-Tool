@@ -1,0 +1,30 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+
+  "name": "Format-app",
+
+  "outputfilename": "pigeon-tool",
+
+  "frontend:install": "",
+  "frontend:build": "",
+  "frontend:dev:watcher": "",
+  "frontend:dev:serverUrl": "",
+
+  "assetdir": "./frontend/dist",
+
+  "author": {
+    "name": "pigeon",
+    "email": "cyd580413@gmail@gmail.com"
+  },
+
+  "info": {
+    "companyName": "Pigeon",
+
+    "productName": "Pigeon Tool",
+
+    "productVersion": "1.0.0",
+
+    "copyright":
+      "Copyright © 2026 Pigeon"
+  }
+}

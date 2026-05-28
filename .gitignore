@@ -1,0 +1,15 @@
+build/
+frontend/dist/
+frontend/node_modules/
+
+*.exe
+*.zip
+
+ffmpeg.exe
+pigeon-tool.exe
+
+.idea/
+.vscode/
+
+__pycache__/
+*.pyc

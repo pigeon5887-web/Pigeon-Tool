@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>pigeon</title>
+    <link rel="stylesheet" href="./public/src/style/global.css">
+    <link rel="stylesheet" href="./public/src/style/tool-convert.css">
+    <link rel="stylesheet" href="./public/src/style/tool-merge.css">
+    <link rel="stylesheet" href="./public/src/style/tool-volume.css">
+</head>
+<body>
+
+<div class="sidebar">
+    <div class="sidebar-header">
+        <div class="logo">
+            <span class="logo-icon"></span>
+            <span class="logo-text">pigeon-tool</span>
+        </div>
+    </div>
+
+    <div class="sidebar-tools">
+        <div class="tool-item active" data-tool="convert">
+            <span class="tool-icon">[C]</span>
+            <span class="tool-name">格式转换</span>
+        </div>
+        <div class="tool-item" data-tool="merge">
+            <span class="tool-icon">[M]</span>
+            <span class="tool-name">音视频合并</span>
+        </div>
+        <div class="tool-item" data-tool="volume">
+            <span class="tool-icon">[V]</span>
+            <span class="tool-name">音量调节</span>
+        </div>
+    </div>
+</div>
+
+<main class="main-content" id="mainContent">
+    <div class="tool-ui-container" id="dynamicUI">
+    </div>
+</main>
+
+<script src="./public/src/functions/app.js"></script>
+<script src="./public/src/functions/tool-convert.js"></script>
+<script src="./public/src/functions/tool-merge.js"></script>
+<script src="./public/src/functions/tool-volume.js"></script>
+<script src="./public/libs/wavesurfer/wavesurfer.min.js"></script>
+<script src="./public/libs/wavesurfer/regions.min.js"></script>
+<script src="./public/libs/wavesurfer/timeline.min.js"></script>
+
+</body>
+</html>

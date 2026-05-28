@@ -1,0 +1,113 @@
+/* 音视频合并工具样式 */
+.merge-demo {
+    background: transparent;
+    border-radius: 18px;
+    padding: 8px 0 0 0;
+}
+
+.merge-layout {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+    justify-content: center;
+    align-items: stretch;
+}
+
+.merge-section {
+    flex: 1;
+    min-width: 280px;
+}
+
+.section-title {
+    color: #b0c7da;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-icon {
+    width: 28px;
+    height: 28px;
+    background: #2b4053;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: #7ac7c7;
+}
+
+.merge-arrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+}
+
+.arrow-icon {
+    font-size: 2rem;
+    color: #5fa3d1;
+    font-weight: bold;
+}
+
+.merge-options {
+    background: rgba(30, 42, 58, 0.5);
+    border-radius: 16px;
+    padding: 20px;
+    margin: 20px 0;
+    border: 1px solid #3a4c5e;
+}
+
+.options-title {
+    color: #b0c7da;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+}
+
+.merge-btn-group {
+    display: flex;
+    gap: 12px;
+    margin: 20px 0;
+}
+
+.merge-btn {
+    flex: 1;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    border-radius: 40px;
+}
+
+.merge-btn.primary {
+    background: #1e2a3a;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.merge-btn.primary:hover:not(:disabled) {
+    background: #2b4053;
+    transform: scale(1.02);
+}
+
+.merge-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+    .merge-layout {
+        flex-direction: column;
+    }
+    
+    .merge-arrow {
+        transform: rotate(90deg);
+        margin: -10px 0;
+    }
+}
