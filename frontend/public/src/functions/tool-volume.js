@@ -6,6 +6,7 @@
 
     var currentFiles = [];
     var currentVolume = 100;
+    var currentPreviewIndex = -1;
     var isProcessing = false;
     var currentIndex = 0;
     var totalFiles = 0;
@@ -41,17 +42,16 @@
                             </div>
                             <div id="waveform" class="waveform-box">
                                 <div class="waveform-empty">等待音频载入...</div>
+                                <button class="wave-nav-btn wave-nav-prev" id="prevWaveBtn" title="上一个音频">‹</button>
+                                <button class="wave-nav-btn wave-nav-next" id="nextWaveBtn" title="下一个音频">›</button>
+                                <div class="wave-current-file" id="waveCurrentFile">未选择音频</div>
                             </div>
                             <div class="waveform-timebar">
                                 <span id="waveCurrentTime">00:00</span>
                                 <span id="waveDuration">00:00</span>
                             </div>
-                            <div class="volume-envelope-wrap">
-                                <div class="volume-envelope-label">整体音量线</div>
-                                <div class="volume-envelope-track">
-                                    <div class="volume-envelope-line" id="volumeEnvelopeLine"></div>
-                                    <div class="volume-envelope-dot" id="volumeEnvelopeDot"></div>
-                                </div>
+                            <div class="waveform-envelope-hint" id="waveformEnvelopeHint">
+                                每个音频拥有独立音量线，点击文件或使用左右箭头切换
                             </div>
                         </div>
 
@@ -189,14 +189,284 @@
         return AUDIO_EXTS.indexOf(getExt(name)) !== -1;
     }
 
+    function getCurrentPreviewFile() {
+        if (currentPreviewIndex < 0 || currentPreviewIndex >= currentFiles.length) return null;
+        return currentFiles[currentPreviewIndex];
+    }
+
+    function ensureFileVolume(file) {
+        if (!file) return 100;
+        if (typeof file.volume !== 'number') {
+            file.volume = 100;
+        }
+        return file.volume;
+    }
+
+    function saveCurrentVolumeToFile() {
+        var file = getCurrentPreviewFile();
+        if (file) {
+            file.volume = clampVolume(currentVolume);
+        }
+    }
+
+    function updateWaveNavigationUI() {
+        var currentFileLabel = document.getElementById('waveCurrentFile');
+        var prevBtn = document.getElementById('prevWaveBtn');
+        var nextBtn = document.getElementById('nextWaveBtn');
+        var hint = document.getElementById('waveformEnvelopeHint');
+
+        var file = getCurrentPreviewFile();
+
+        if (currentFileLabel) {
+            if (file) {
+                currentFileLabel.textContent = (currentPreviewIndex + 1) + ' / ' + currentFiles.length + '  ' + file.name + '  ·  ' + ensureFileVolume(file) + '%';
+            } else {
+                currentFileLabel.textContent = '未选择音频';
+            }
+        }
+
+        if (prevBtn) prevBtn.disabled = currentFiles.length <= 1 || currentPreviewIndex <= 0;
+        if (nextBtn) nextBtn.disabled = currentFiles.length <= 1 || currentPreviewIndex >= currentFiles.length - 1;
+
+        if (hint) {
+            if (currentFiles.length > 1) {
+                hint.textContent = '当前音量只作用于当前音频；导出时每个音频使用自己的音量线';
+            } else {
+                hint.textContent = '拖动波形上的音量线可调整当前音频音量';
+            }
+        }
+    }
+
+    async function switchPreviewTo(index, logContainer) {
+        if (index < 0 || index >= currentFiles.length) return;
+
+        saveCurrentVolumeToFile();
+
+        currentPreviewIndex = index;
+        var file = currentFiles[currentPreviewIndex];
+        var volume = ensureFileVolume(file);
+
+        syncVolumeControls(volume);
+
+        if (file && file.blobFile) {
+            await loadPreviewBlob(file.blobFile, logContainer, file.name);
+        } else if (file && file.path) {
+            await loadPreviewFromPath(file, logContainer);
+        } else {
+            var status = document.getElementById('waveformStatus');
+            var waveformBox = document.getElementById('waveform');
+            var playBtn = document.getElementById('playPauseWaveBtn');
+
+            if (playBtn) playBtn.disabled = true;
+            if (status) status.textContent = '当前文件无法预览波形';
+            if (waveformBox) {
+                initWaveSurfer(logContainer);
+                waveformBox.insertAdjacentHTML('afterbegin', '<div class="waveform-empty">当前文件无法预览波形</div>');
+            }
+        }
+
+        updateWaveNavigationUI();
+        updateFileList();
+    }
+
+    function clampVolume(value) {
+        return Math.max(0, Math.min(200, parseInt(value, 10) || 0));
+    }
+
+    function volumeToY(volume) {
+        var percent = Math.max(0, Math.min(100, volume / 200 * 100));
+        return 100 - percent;
+    }
+
+    function yToVolume(clientY, element) {
+        var rect = element.getBoundingClientRect();
+        var y = clientY - rect.top;
+        var ratio = 1 - Math.max(0, Math.min(1, y / rect.height));
+        return clampVolume(Math.round(ratio * 200));
+    }
+
+    function applyPreviewVolume() {
+        if (!wavesurfer) return;
+        try {
+            wavesurfer.setVolume(Math.max(0, currentVolume / 100));
+        } catch (e) {}
+    }
+
+    function updateWaveformVisualGain() {
+        var waveformBox = document.getElementById('waveform');
+        if (!waveformBox) return;
+
+        var scale = currentVolume / 100;
+        scale = Math.max(0.08, Math.min(2.0, scale));
+
+        waveformBox.style.setProperty('--waveform-gain-scale', scale);
+
+        var children = Array.prototype.slice.call(waveformBox.children || []);
+
+        children.forEach(function(child) {
+            if (!child) return;
+
+            // 这些是控制层，不能参与波形缩放，否则会被挤压/变形
+            if (child.id === 'volumeEnvelopeOverlay') return;
+            if (child.id === 'prevWaveBtn') return;
+            if (child.id === 'nextWaveBtn') return;
+            if (child.id === 'waveCurrentFile') return;
+
+            if (child.classList) {
+                if (child.classList.contains('waveform-empty')) return;
+                if (child.classList.contains('wave-nav-btn')) return;
+                if (child.classList.contains('wave-current-file')) return;
+                if (child.classList.contains('volume-envelope-overlay')) return;
+            }
+
+            // 只缩放 WaveSurfer 真实渲染层
+            child.classList.add('waveform-render-layer');
+            child.style.transform = 'scaleY(' + scale + ')';
+            child.style.transformOrigin = 'center center';
+            child.style.transition = 'transform 0.1s ease';
+        });
+    }
+
+    function syncVolumeControls(volume) {
+        currentVolume = clampVolume(volume);
+
+        var volumeSlider = document.getElementById('volumeSlider');
+        var volumePercent = document.getElementById('volumePercent');
+
+        if (volumeSlider) volumeSlider.value = currentVolume;
+        if (volumePercent) volumePercent.textContent = currentVolume;
+
+        var file = getCurrentPreviewFile();
+        if (file) file.volume = currentVolume;
+
+        updateEnvelopeLine();
+        applyPreviewVolume();
+        updateWaveformVisualGain();
+        updateWaveNavigationUI();
+        updateFileList();
+    }
+
+    function bindWaveNavigationButtons() {
+        var logContainer = document.getElementById('volumeLogArea');
+        var prevBtn = document.getElementById('prevWaveBtn');
+        var nextBtn = document.getElementById('nextWaveBtn');
+
+        if (prevBtn && !prevBtn.dataset.bound) {
+            prevBtn.dataset.bound = '1';
+            prevBtn.addEventListener('click', function(event) {
+                event.stopPropagation();
+                switchPreviewTo(currentPreviewIndex - 1, logContainer);
+            });
+        }
+
+        if (nextBtn && !nextBtn.dataset.bound) {
+            nextBtn.dataset.bound = '1';
+            nextBtn.addEventListener('click', function(event) {
+                event.stopPropagation();
+                switchPreviewTo(currentPreviewIndex + 1, logContainer);
+            });
+        }
+    }
+
+    function ensureWaveformEnvelopeOverlay() {
+        var waveformBox = document.getElementById('waveform');
+        if (!waveformBox) return null;
+
+        var overlay = document.getElementById('volumeEnvelopeOverlay');
+        if (overlay && overlay.parentElement === waveformBox) {
+            return overlay;
+        }
+
+        overlay = document.createElement('div');
+        overlay.id = 'volumeEnvelopeOverlay';
+        overlay.className = 'volume-envelope-overlay';
+        overlay.innerHTML =
+            '<div class="volume-envelope-guide volume-envelope-guide-25"></div>' +
+            '<div class="volume-envelope-guide volume-envelope-guide-50"></div>' +
+            '<div class="volume-envelope-guide volume-envelope-guide-75"></div>' +
+            '<div class="volume-envelope-fill" id="volumeEnvelopeFill"></div>' +
+            '<div class="volume-envelope-line" id="volumeEnvelopeLine"></div>' +
+            '<div class="volume-envelope-dot" id="volumeEnvelopeDot"></div>' +
+            '<div class="volume-envelope-badge" id="volumeEnvelopeBadge">100%</div>';
+
+        waveformBox.appendChild(overlay);
+
+        if (!document.getElementById('prevWaveBtn')) {
+            var prevBtn = document.createElement('button');
+            prevBtn.className = 'wave-nav-btn wave-nav-prev';
+            prevBtn.id = 'prevWaveBtn';
+            prevBtn.title = '上一个音频';
+            prevBtn.textContent = '‹';
+            waveformBox.appendChild(prevBtn);
+        }
+
+        if (!document.getElementById('nextWaveBtn')) {
+            var nextBtn = document.createElement('button');
+            nextBtn.className = 'wave-nav-btn wave-nav-next';
+            nextBtn.id = 'nextWaveBtn';
+            nextBtn.title = '下一个音频';
+            nextBtn.textContent = '›';
+            waveformBox.appendChild(nextBtn);
+        }
+
+        if (!document.getElementById('waveCurrentFile')) {
+            var fileLabel = document.createElement('div');
+            fileLabel.className = 'wave-current-file';
+            fileLabel.id = 'waveCurrentFile';
+            fileLabel.textContent = '未选择音频';
+            waveformBox.appendChild(fileLabel);
+        }
+
+        bindWaveNavigationButtons();
+        updateWaveNavigationUI();
+
+        var dragging = false;
+
+        function handleDrag(event) {
+            if (!dragging) return;
+            event.preventDefault();
+            syncVolumeControls(yToVolume(event.clientY, overlay));
+        }
+
+        overlay.addEventListener('mousedown', function(event) {
+            dragging = true;
+            syncVolumeControls(yToVolume(event.clientY, overlay));
+            document.addEventListener('mousemove', handleDrag);
+            document.addEventListener('mouseup', function stopDrag() {
+                dragging = false;
+                document.removeEventListener('mousemove', handleDrag);
+                document.removeEventListener('mouseup', stopDrag);
+            });
+        });
+
+        return overlay;
+    }
+
     function updateEnvelopeLine() {
+        var overlay = ensureWaveformEnvelopeOverlay();
         var line = document.getElementById('volumeEnvelopeLine');
         var dot = document.getElementById('volumeEnvelopeDot');
-        if (!line || !dot) return;
-        var percent = Math.max(0, Math.min(100, currentVolume / 200 * 100));
-        var y = 100 - percent;
-        line.style.top = y + '%';
-        dot.style.top = y + '%';
+        var fill = document.getElementById('volumeEnvelopeFill');
+        var badge = document.getElementById('volumeEnvelopeBadge');
+
+        if (!overlay || !line || !dot) return;
+
+        var y = volumeToY(currentVolume);
+        var topValue = y + '%';
+
+        line.style.top = topValue;
+        dot.style.top = topValue;
+
+        if (fill) {
+            fill.style.top = topValue;
+            fill.style.height = (100 - y) + '%';
+        }
+
+        if (badge) {
+            badge.style.top = topValue;
+            badge.textContent = currentVolume + '%';
+        }
+
         dot.title = currentVolume + '%';
     }
 
@@ -229,6 +499,11 @@
             barRadius: 2,
             normalize: true
         });
+
+        ensureWaveformEnvelopeOverlay();
+        updateEnvelopeLine();
+        applyPreviewVolume();
+        updateWaveformVisualGain();
 
         var playBtn = document.getElementById('playPauseWaveBtn');
         var status = document.getElementById('waveformStatus');
@@ -263,12 +538,72 @@
         return await window.go.main.App.SaveTempFile(file.name, bytes);
     }
 
-    async function loadPreviewBlob(file, logContainer) {
+    function guessAudioMime(name) {
+        var ext = getExt(name);
+        var map = {
+            mp3: 'audio/mpeg',
+            wav: 'audio/wav',
+            ogg: 'audio/ogg',
+            flac: 'audio/flac',
+            aac: 'audio/aac',
+            m4a: 'audio/mp4',
+            wma: 'audio/x-ms-wma',
+            opus: 'audio/opus'
+        };
+        return map[ext] || 'audio/*';
+    }
+
+    function base64ToBlob(base64, mimeType) {
+        var binary = atob(base64);
+        var len = binary.length;
+        var bytes = new Uint8Array(len);
+
+        for (var i = 0; i < len; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+
+        return new Blob([bytes], {
+            type: mimeType || 'audio/*'
+        });
+    }
+
+    async function loadPreviewFromPath(file, logContainer) {
+        if (!file || !file.path) return;
+
+        if (!window.go || !window.go.main || !window.go.main.App || !window.go.main.App.ReadFileAsBase64) {
+            addTerminalLog(logContainer, '当前后端不支持路径波形预览，请更新 app.go', 'error');
+            return;
+        }
+
+        var status = document.getElementById('waveformStatus');
+        var playBtn = document.getElementById('playPauseWaveBtn');
+
+        if (playBtn) playBtn.disabled = true;
+        if (status) status.textContent = '正在读取本地文件：' + file.name;
+
+        try {
+            var result = await window.go.main.App.ReadFileAsBase64(file.path);
+
+            if (!result || !result.success) {
+                throw new Error(result && result.error ? result.error : '读取文件失败');
+            }
+
+            var blob = base64ToBlob(result.output, guessAudioMime(file.name));
+            file.blobFile = blob;
+
+            await loadPreviewBlob(blob, logContainer, file.name);
+        } catch (error) {
+            addTerminalLog(logContainer, '路径波形预览失败: ' + error.message, 'error');
+            if (status) status.textContent = '路径波形预览失败：' + file.name;
+        }
+    }
+
+    async function loadPreviewBlob(file, logContainer, displayName) {
         previewFileObject = file;
         var status = document.getElementById('waveformStatus');
         var playBtn = document.getElementById('playPauseWaveBtn');
         if (playBtn) playBtn.disabled = true;
-        if (status) status.textContent = '正在解析波形：' + file.name;
+        if (status) status.textContent = '正在解析波形：' + (displayName || file.name);
 
         var ws = wavesurfer || initWaveSurfer(logContainer);
         if (!ws) return;
@@ -279,17 +614,22 @@
             addTerminalLog(logContainer, '波形加载失败: ' + error.message, 'error');
             if (status) status.textContent = '波形加载失败';
         }
+
+        updateWaveNavigationUI();
+        updateEnvelopeLine();
+        updateWaveformVisualGain();
     }
 
-    function generateOutputFileName(originalName, outputFormat, autoRename, index) {
+    function generateOutputFileName(originalName, outputFormat, autoRename, index, volume) {
         var dot = originalName.lastIndexOf('.');
         var originalBase = dot > 0 ? originalName.substring(0, dot) : originalName;
         var ext = outputFormat === 'same' ? getExt(originalName) : outputFormat;
         if (!ext) ext = 'mp3';
-        var fileName = originalBase + '_volume_' + currentVolume + '.' + ext;
+        volume = clampVolume(volume);
+        var fileName = originalBase + '_volume_' + volume + '.' + ext;
         if (autoRename) {
             var timestamp = new Date().toISOString().slice(0, 19).replace(/:/g, '-');
-            fileName = originalBase + '_volume_' + currentVolume + '_' + timestamp + '_' + index + '.' + ext;
+            fileName = originalBase + '_volume_' + volume + '_' + timestamp + '_' + index + '.' + ext;
         }
         return fileName;
     }
@@ -316,12 +656,14 @@
         if (totalSizeSpan) totalSizeSpan.textContent = formatFileSize(totalSize);
 
         fileList.innerHTML = currentFiles.map(function(file, i) {
+            var vol = ensureFileVolume(file);
+            var activeClass = i === currentPreviewIndex ? ' active' : '';
             return `
-                <div class="file-list-item" data-index="${i}">
+                <div class="file-list-item${activeClass}" data-index="${i}">
                     <span class="file-list-icon">[A]</span>
                     <div class="file-list-info">
                         <div class="file-list-name">${escapeHtml(file.name)}</div>
-                        <div class="file-list-size">${formatFileSize(file.size || 0)}</div>
+                        <div class="file-list-size">${formatFileSize(file.size || 0)} · ${vol}%</div>
                     </div>
                     <button class="file-list-remove" data-index="${i}">[X]</button>
                 </div>
@@ -332,10 +674,7 @@
             item.addEventListener('click', function(e) {
                 if (e.target.classList.contains('file-list-remove')) return;
                 var idx = parseInt(this.dataset.index, 10);
-                var itemData = currentFiles[idx];
-                if (itemData && itemData.blobFile) {
-                    loadPreviewBlob(itemData.blobFile, document.getElementById('volumeLogArea'));
-                }
+                switchPreviewTo(idx, document.getElementById('volumeLogArea'));
             });
         });
 
@@ -344,6 +683,19 @@
                 e.stopPropagation();
                 var idx = parseInt(this.dataset.index, 10);
                 currentFiles.splice(idx, 1);
+
+                if (currentFiles.length === 0) {
+                    currentPreviewIndex = -1;
+                    currentVolume = 100;
+                    syncVolumeControls(100);
+                    initWaveSurfer(document.getElementById('volumeLogArea'));
+                    var status = document.getElementById('waveformStatus');
+                    if (status) status.textContent = '请选择音频文件，波形会在这里显示';
+                } else {
+                    if (currentPreviewIndex >= currentFiles.length) currentPreviewIndex = currentFiles.length - 1;
+                    switchPreviewTo(currentPreviewIndex, document.getElementById('volumeLogArea'));
+                }
+
                 updateFileList();
             };
         });
@@ -379,21 +731,17 @@
 
         addTerminalLog(logContainer, '工具已加载，等待选择文件', 'info');
         initWaveSurfer(logContainer);
-        updateEnvelopeLine();
+        bindWaveNavigationButtons();
+        syncVolumeControls(100);
 
         volumeSlider.addEventListener('input', function(e) {
-            currentVolume = parseInt(e.target.value, 10);
-            volumePercent.textContent = currentVolume;
-            updateEnvelopeLine();
+            syncVolumeControls(e.target.value);
         });
 
         volumePresetBtns.forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var vol = parseInt(this.dataset.volume, 10);
-                volumeSlider.value = vol;
-                currentVolume = vol;
-                volumePercent.textContent = vol;
-                updateEnvelopeLine();
+                syncVolumeControls(vol);
             });
         });
 
@@ -429,10 +777,14 @@
                             path: saved.path,
                             size: saved.size || f.size,
                             blobFile: f,
-                            fromTemp: true
+                            fromTemp: true,
+                            volume: 100
                         });
+                        var newIndex = currentFiles.length - 1;
                         addedCount++;
-                        if (addedCount === 1) await loadPreviewBlob(f, logContainer);
+                        if (currentPreviewIndex === -1) {
+                            await switchPreviewTo(newIndex, logContainer);
+                        }
                     } else {
                         addTerminalLog(logContainer, '保存临时文件失败: ' + (saved && saved.error ? saved.error : f.name), 'error');
                     }
@@ -459,13 +811,20 @@
                     for (var i = 0; i < result.files.length; i++) {
                         var file = result.files[i];
                         if (isAudioName(file.name)) {
+                            file.volume = 100;
                             currentFiles.push(file);
+                            if (currentPreviewIndex === -1) currentPreviewIndex = currentFiles.length - 1;
                             addedCount++;
                         }
                     }
+                    if (currentPreviewIndex >= 0) {
+                        syncVolumeControls(ensureFileVolume(currentFiles[currentPreviewIndex]));
+                        await switchPreviewTo(currentPreviewIndex, logContainer);
+                    }
+                    updateWaveNavigationUI();
                     updateFileList();
                     addTerminalLog(logContainer, '从文件夹中添加了 ' + addedCount + ' 个音频文件', 'info');
-                    addTerminalLog(logContainer, '提示：文件夹导入只有路径，不能直接生成波形；要看波形请用“选择文件”', 'warning');
+                    addTerminalLog(logContainer, '文件夹导入完成，可通过文件列表或左右箭头切换并预览波形', 'success');
                 }
             } catch (error) {
                 addTerminalLog(logContainer, '选择文件夹失败: ' + error.message, 'error');
@@ -474,6 +833,8 @@
 
         clearAllBtn.addEventListener('click', function() {
             currentFiles = [];
+            currentPreviewIndex = -1;
+            currentVolume = 100;
             previewFileObject = null;
             updateFileList();
             initWaveSurfer(logContainer);
@@ -522,7 +883,7 @@
 
             addTerminalLog(logContainer, '========== 开始批量处理 ==========', 'info');
             addTerminalLog(logContainer, '总文件数: ' + totalFiles, 'info');
-            addTerminalLog(logContainer, '音量: ' + currentVolume + '%', 'info');
+            addTerminalLog(logContainer, '音量: 每个音频使用各自的音量线', 'info');
             addTerminalLog(logContainer, '输出格式: ' + (outFormat === 'same' ? '保持原格式' : outFormat.toUpperCase()), 'info');
 
             for (var i = 0; i < totalFiles; i++) {
@@ -535,7 +896,8 @@
                 addTerminalLog(logContainer, '', 'info');
                 addTerminalLog(logContainer, '[' + currentIndex + '/' + totalFiles + '] 处理: ' + file.name, 'info');
 
-                var outputFileName = generateOutputFileName(file.name, outFormat, autoRename, i);
+                var fileVolume = ensureFileVolume(file);
+                var outputFileName = generateOutputFileName(file.name, outFormat, autoRename, i, fileVolume);
                 var outputPath;
                 if (customOutputDir) {
                     outputPath = customOutputDir + '\\' + outputFileName;
@@ -549,7 +911,8 @@
                 }
 
                 try {
-                    var result = await window.go.main.App.AdjustVolume(file.path, outputPath, currentVolume, outFormat);
+                    addTerminalLog(logContainer, '  音量: ' + fileVolume + '%', 'info');
+                    var result = await window.go.main.App.AdjustVolume(file.path, outputPath, fileVolume, outFormat);
                     if (result && result.success) {
                         successCount++;
                         addTerminalLog(logContainer, '  [成功] ' + outputPath, 'success');

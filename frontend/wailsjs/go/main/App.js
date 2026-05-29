@@ -26,6 +26,10 @@ export function MergeVideoAudio(arg1, arg2, arg3, arg4, arg5, arg6) {
   return window['go']['main']['App']['MergeVideoAudio'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
+export function ReadFileAsBase64(arg1) {
+  return window['go']['main']['App']['ReadFileAsBase64'](arg1);
+}
+
 export function SaveTempFile(arg1, arg2) {
   return window['go']['main']['App']['SaveTempFile'](arg1, arg2);
 }

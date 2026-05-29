@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/fs"
@@ -511,6 +512,27 @@ func (a *App) AdjustVolume(inputPath string, outputPath string, volume int, outp
 	}
 
 	return a.executePythonTask("volume", data)
+}
+
+
+// ReadFileAsBase64 读取本地文件并返回 base64，用于前端生成波形预览
+func (a *App) ReadFileAsBase64(filePath string) (*TaskResult, error) {
+	if filePath == "" {
+		return &TaskResult{Success: false, Error: "文件路径不能为空"}, nil
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return &TaskResult{
+			Success: false,
+			Error:   fmt.Sprintf("读取文件失败: %v", err),
+		}, nil
+	}
+
+	return &TaskResult{
+		Success: true,
+		Output:  base64.StdEncoding.EncodeToString(data),
+	}, nil
 }
 
 // ========== 4. 辅助功能 ==========

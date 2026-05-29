@@ -751,3 +751,274 @@
     box-shadow: 0 0 10px rgba(122,199,199,0.6);
     transition: top 0.15s ease;
 }
+
+
+/* ========== 剪辑软件式波形音量线 ========== */
+
+.waveform-box {
+    position: relative;
+    height: 160px;
+    overflow: hidden;
+}
+
+/* 波形上的可拖拽音量包络层 */
+.volume-envelope-overlay {
+    position: absolute;
+    inset: 10px 8px;
+    z-index: 20;
+    pointer-events: auto;
+    cursor: ns-resize;
+    border-radius: 10px;
+}
+
+/* 轨道刻度线 */
+.volume-envelope-guide {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: rgba(255, 255, 255, 0.08);
+    pointer-events: none;
+}
+
+.volume-envelope-guide-25 {
+    top: 25%;
+}
+
+.volume-envelope-guide-50 {
+    top: 50%;
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.volume-envelope-guide-75 {
+    top: 75%;
+}
+
+/* 当前音量覆盖区域 */
+.volume-envelope-fill {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(
+        180deg,
+        rgba(62, 166, 255, 0.22),
+        rgba(122, 199, 199, 0.06)
+    );
+    pointer-events: none;
+    transition: top 0.1s ease, height 0.1s ease;
+}
+
+/* 波形上的音量线 */
+.volume-envelope-line {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: rgba(255, 255, 255, 0.96);
+    box-shadow:
+        0 0 8px rgba(62, 166, 255, 0.9),
+        0 0 18px rgba(62, 166, 255, 0.35);
+    transform: translateY(-1px);
+    pointer-events: none;
+    transition: top 0.1s ease;
+}
+
+/* 右侧拖拽点 */
+.volume-envelope-dot {
+    position: absolute;
+    right: 10px;
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    background: #3ea6ff;
+    border: 2px solid white;
+    transform: translateY(-7.5px);
+    box-shadow:
+        0 0 8px rgba(62, 166, 255, 0.9),
+        0 2px 10px rgba(0, 0, 0, 0.35);
+    pointer-events: none;
+    transition: top 0.1s ease;
+}
+
+/* 音量百分比小标签 */
+.volume-envelope-badge {
+    position: absolute;
+    right: 32px;
+    transform: translateY(-50%);
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: rgba(15, 26, 36, 0.86);
+    border: 1px solid rgba(122, 199, 199, 0.55);
+    color: #e0e6ed;
+    font-size: 0.72rem;
+    font-family: 'SF Mono', 'Fira Code', monospace;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+    transition: top 0.1s ease;
+}
+
+.waveform-envelope-hint {
+    color: #7a9eb3;
+    font-size: 0.74rem;
+    margin-top: 8px;
+    text-align: center;
+}
+
+/* 旧版单独音量轨道隐藏，避免重复出现 */
+.volume-envelope-wrap {
+    display: none !important;
+}
+
+
+/* ========== 波形随音量实时缩放预览 ========== */
+
+/*
+ * 这里不是重新解码音频，而是对 WaveSurfer 渲染层做视觉增益缩放。
+ * 100% = 原始高度
+ * 50%  = 波形视觉高度降低
+ * 200% = 波形视觉高度放大
+ */
+.waveform-box {
+    --waveform-gain-scale: 1;
+}
+
+.waveform-render-layer {
+    transform: scaleY(var(--waveform-gain-scale, 1));
+    transform-origin: center center;
+    transition: transform 0.1s ease;
+    will-change: transform;
+}
+
+/* 兼容部分 WaveSurfer 渲染结构 */
+#waveform > wave,
+#waveform > div:not(#volumeEnvelopeOverlay):not(.waveform-empty),
+#waveform canvas {
+    transform-origin: center center;
+    will-change: transform;
+}
+
+/* 音量包络层保持独立，不跟着波形缩放 */
+#volumeEnvelopeOverlay {
+    transform: none !important;
+}
+
+
+/* ========== 多音频独立音轨预览导航 ========== */
+
+.wave-nav-btn {
+    position: absolute;
+    bottom: 10px;
+    z-index: 32;
+    width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    border: 1px solid rgba(122, 199, 199, 0.55);
+    background: rgba(15, 26, 36, 0.78);
+    color: #e0e6ed;
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35);
+    transition: transform 0.15s ease, background 0.15s ease, opacity 0.15s ease;
+}
+
+.wave-nav-btn:hover:not(:disabled) {
+    background: rgba(43, 64, 83, 0.92);
+    transform: translateY(-1px) scale(1.04);
+}
+
+.wave-nav-btn:disabled {
+    opacity: 0.32;
+    cursor: not-allowed;
+}
+
+.wave-nav-prev {
+    left: 12px;
+}
+
+.wave-nav-next {
+    right: 12px;
+}
+
+.wave-current-file {
+    position: absolute;
+    left: 54px;
+    right: 54px;
+    bottom: 13px;
+    z-index: 31;
+    height: 28px;
+    line-height: 28px;
+    border-radius: 999px;
+    padding: 0 12px;
+    text-align: center;
+    color: #dce8f2;
+    font-size: 0.74rem;
+    background: rgba(15, 26, 36, 0.68);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    pointer-events: none;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.file-list-item.active {
+    background: rgba(62, 166, 255, 0.13);
+    border-left: 3px solid #3ea6ff;
+}
+
+.file-list-item.active .file-list-name {
+    color: #ffffff;
+}
+
+.file-list-item.active .file-list-size {
+    color: #7ac7c7;
+}
+
+
+/* ========== 修复：波形缩放不影响音频切换 UI ========== */
+
+/* 控制层永远固定，不参与波形 scaleY */
+.wave-nav-btn,
+.wave-current-file,
+.volume-envelope-overlay,
+#volumeEnvelopeOverlay,
+#prevWaveBtn,
+#nextWaveBtn,
+#waveCurrentFile {
+    transform: none !important;
+    flex-shrink: 0;
+}
+
+/* 只有真正的波形渲染层才允许缩放 */
+.waveform-render-layer {
+    transform: scaleY(var(--waveform-gain-scale, 1));
+    transform-origin: center center;
+    transition: transform 0.1s ease;
+    will-change: transform;
+}
+
+/* 避免通用选择器误伤按钮和文字标签 */
+#waveform > div:not(#volumeEnvelopeOverlay):not(.waveform-empty):not(.wave-current-file):not(.volume-envelope-overlay),
+#waveform canvas,
+#waveform wave {
+    transform-origin: center center;
+    will-change: transform;
+}
+
+/* 二次保险：导航和标签层级固定在最上面 */
+.wave-nav-btn {
+    z-index: 40;
+}
+
+.wave-current-file {
+    z-index: 39;
+}
+
+#volumeEnvelopeOverlay {
+    z-index: 30;
+}
