@@ -1,0 +1,389 @@
+/* frontend/src/style/tool-qrcode.css */
+
+/* ============ 二维码生成工具样式 ============ */
+
+.qrcode-demo {
+    background: transparent;
+    border-radius: 18px;
+    padding: 8px 0 0 0;
+}
+
+.qrcode-layout {
+    display: flex;
+    gap: 32px;
+    flex-wrap: wrap;
+    margin: 20px 0;
+}
+
+.qrcode-left-panel {
+    flex: 1.2;
+    min-width: 340px;
+}
+
+.qrcode-right-panel {
+    flex: 1;
+    min-width: 300px;
+}
+
+/* 输入组 */
+.input-group {
+    margin-bottom: 20px;
+}
+
+.input-label {
+    display: block;
+    color: #b0c7da;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.input-group .field {
+    width: 100%;
+    padding: 12px 16px;
+    background: #0f1a24;
+    border: 1px solid #3a4c5e;
+    border-radius: 12px;
+    font-size: 0.9rem;
+    color: #e0e6ed;
+    transition: 0.15s;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.input-group .field:focus {
+    border-color: #3ea6ff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(62, 166, 255, 0.2);
+}
+
+/* 选项网格 */
+.options-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 16px;
+}
+
+.options-grid .option-item {
+    min-width: 0;
+}
+
+.options-grid .field {
+    width: 100%;
+    padding: 10px 14px;
+    background: #0f1a24;
+    border: 1px solid #3a4c5e;
+    border-radius: 12px;
+    color: #e0e6ed;
+    font-size: 0.9rem;
+    transition: 0.15s;
+}
+
+.options-grid .field:focus {
+    border-color: #3ea6ff;
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(62, 166, 255, 0.2);
+}
+
+.color-picker {
+    padding: 4px !important;
+    height: 44px;
+    cursor: pointer;
+}
+
+.color-picker::-webkit-color-swatch-wrapper {
+    padding: 4px;
+}
+
+.color-picker::-webkit-color-swatch {
+    border-radius: 8px;
+    border: none;
+}
+
+/* Logo 上传区域 */
+.logo-upload-section {
+    margin-bottom: 20px;
+}
+
+.logo-upload-area {
+    background: rgba(30, 42, 58, 0.5);
+    border: 2px dashed #3a4c5e;
+    border-radius: 16px;
+    padding: 24px 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.logo-upload-area:hover {
+    border-color: #5fa3d1;
+    background: rgba(48, 68, 88, 0.6);
+}
+
+.logo-upload-area.dragover {
+    border-color: #3ea6ff;
+    background: rgba(62, 166, 255, 0.1);
+    transform: scale(1.01);
+}
+
+.logo-upload-icon {
+    font-size: 2rem;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.logo-upload-text {
+    color: #e0e6ed;
+    font-size: 0.95rem;
+    margin-bottom: 4px;
+}
+
+.logo-upload-hint {
+    color: #7a9eb3;
+    font-size: 0.75rem;
+}
+
+.logo-preview-container {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: #0f1a24;
+    border: 1px solid #3a4c5e;
+    border-radius: 16px;
+    padding: 12px 16px;
+    margin-top: 12px;
+}
+
+.logo-preview {
+    width: 56px;
+    height: 56px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #1a2632;
+    border: 1px solid #3a4c5e;
+}
+
+.logo-remove-btn {
+    background: transparent;
+    border: none;
+    color: #e06c75;
+    cursor: pointer;
+    font-size: 0.85rem;
+    padding: 4px 12px;
+    border-radius: 8px;
+    transition: 0.2s;
+    margin-left: auto;
+}
+
+.logo-remove-btn:hover {
+    background: rgba(224, 108, 117, 0.15);
+}
+
+/* 按钮组 */
+.qrcode-btn-group {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 4px;
+}
+
+.qrcode-btn-group .button {
+    flex: 1;
+    padding: 12px 20px;
+    font-size: 0.95rem;
+    border-radius: 40px;
+    min-width: 120px;
+    justify-content: center;
+}
+
+.qrcode-btn-group .button.primary {
+    background: #1e2a3a;
+    color: white;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+
+.qrcode-btn-group .button.primary:hover:not(:disabled) {
+    background: #2b4053;
+    transform: scale(1.02);
+}
+
+.qrcode-btn-group .button.secondary {
+    background: #3e5a6d;
+}
+
+.qrcode-btn-group .button.secondary:hover:not(:disabled) {
+    background: #4b6f88;
+}
+
+.qrcode-btn-group .button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* 预览区 */
+.preview-container {
+    background: rgba(30, 42, 58, 0.5);
+    border: 1px solid #3a4c5e;
+    border-radius: 16px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.preview-title {
+    color: #b0c7da;
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 16px;
+}
+
+.qr-preview-box {
+    background: #0f1a24;
+    border-radius: 16px;
+    min-height: 260px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    border: 1px solid #2e3d4e;
+}
+
+.qr-placeholder {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    color: #7a9eb3;
+    padding: 20px;
+    text-align: center;
+    width: 100%;
+    height: 100%;
+}
+
+.qr-placeholder-icon {
+    font-size: 3rem;
+    margin-bottom: 12px;
+    opacity: 0.5;
+}
+
+.qr-placeholder-text {
+    font-size: 0.9rem;
+}
+
+#qrCodeContainer {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+#qrCodeContainer canvas,
+#qrCodeContainer img,
+#qrCodeContainer svg {
+    max-width: 100%;
+    max-height: 100%;
+    border-radius: 8px;
+}
+
+#qrCodeContainer .qr-error {
+    color: #e06c75;
+    font-size: 0.9rem;
+    padding: 20px;
+}
+
+.preview-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 14px;
+}
+
+.preview-actions .button {
+    padding: 8px 16px;
+    font-size: 0.8rem;
+    background: #2b4053;
+    border: none;
+    color: white;
+    border-radius: 30px;
+    cursor: pointer;
+    transition: 0.2s;
+}
+
+.preview-actions .button:hover {
+    background: #3e5a6d;
+}
+
+/* 格式信息 (复用) */
+.format-info {
+    background: rgba(30, 42, 58, 0.3);
+    border-radius: 12px;
+    padding: 16px;
+    margin-top: 20px;
+    font-size: 0.8rem;
+    color: #b0c7da;
+}
+
+.format-info .info-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+    color: #e0e6ed;
+    font-weight: 600;
+}
+
+.format-info-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px 16px;
+}
+
+.format-info-item {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 0.75rem;
+}
+
+.format-info-item .format {
+    color: white;
+    font-weight: 600;
+    min-width: 20px;
+}
+
+/* 响应式 */
+@media (max-width: 900px) {
+    .qrcode-layout {
+        flex-direction: column;
+    }
+
+    .qrcode-left-panel,
+    .qrcode-right-panel {
+        width: 100%;
+    }
+
+    .options-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .options-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .qrcode-btn-group {
+        flex-direction: column;
+    }
+
+    .format-info-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .qr-preview-box {
+        min-height: 200px;
+    }
+}

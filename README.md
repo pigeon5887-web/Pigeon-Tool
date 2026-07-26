@@ -53,6 +53,27 @@ Dynamic background switching support.
 
 ---
 
+## QR Code Generation
+
+Generate QR codes from text or URLs with customizable styles and logo embedding.
+
+**Features:**
+- Convert text or URLs to QR codes instantly
+- Embed images as logo (center/background/mix modes)
+- Customizable colors, size, and border width
+- Error correction levels: L/M/Q/H
+- Preview and export as PNG
+
+**Preview:**
+
+![QR Code Generation](./screenshots/qrcode-generate.png)
+
+![Logo Center Embedding](./screenshots/qrcode-logo-center.png)
+
+![Logo Background Mode](./screenshots/qrcode-logo-bg.png)
+
+**Tech Stack:** Python Pillow + qrcode
+
 # Features
 
 * Media format conversion
@@ -65,6 +86,7 @@ Dynamic background switching support.
 * Dynamic background switching
 * FFmpeg-based processing
 * Single executable release support
+* QR code generation with logo embedding
 
 ---
 

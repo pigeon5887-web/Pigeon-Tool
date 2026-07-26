@@ -10,11 +10,15 @@ export function ConvertVideo(arg1:string,arg2:string,arg3:string,arg4:string,arg
 
 export function DeleteTempFile(arg1:string):Promise<void>;
 
+export function GenerateQRCode(arg1:string,arg2:number,arg3:string,arg4:string,arg5:string,arg6:string,arg7:string,arg8:number):Promise<main.TaskResult>;
+
+export function GetAudioInfo(arg1:string):Promise<main.TaskResult>;
+
 export function GetFileInfo(arg1:string):Promise<main.TaskResult>;
 
-export function MergeVideoAudio(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.TaskResult>;
+export function GetPreviewPort():Promise<number>;
 
-export function ReadFileAsBase64(arg1:string):Promise<main.TaskResult>;
+export function MergeVideoAudio(arg1:string,arg2:string,arg3:string,arg4:string,arg5:string,arg6:string):Promise<main.TaskResult>;
 
 export function SaveTempFile(arg1:string,arg2:Array<number>):Promise<main.FileInfo>;
 

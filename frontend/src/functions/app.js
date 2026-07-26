@@ -25,7 +25,8 @@
         var map = {
             'convert': '格式转换',
             'merge': '音视频合并',
-            'volume': '音量调节'
+            'volume': '音量调节',
+            'qrcode': '二维码生成'
         };
         return map[toolId] || toolId;
     }

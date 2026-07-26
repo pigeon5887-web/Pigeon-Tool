@@ -131,10 +131,19 @@
                             </div>
                         </div>
 
+                        <!-- ========== 批量同步调节开关 ========== -->
+                        <div class="batch-sync-container" style="margin-top: 16px; display: flex; align-items: center; gap: 16px; padding: 12px 16px; background: rgba(0,0,0,0.3); border-radius: 12px; border: 1px solid #3a4c5e;">
+                            <label class="checkbox-label" style="display: flex; align-items: center; gap: 10px; color: #e0e6ed; cursor: pointer; font-size: 0.9rem;">
+                                <input type="checkbox" id="batchSyncVolume" checked>
+                                <span>批量同步调节音量</span>
+                            </label>
+                            <span style="color: #7a9eb3; font-size: 0.75rem;">开启后，拖动音量线会同步应用到所有音频文件</span>
+                        </div>
+
                         <div class="format-info">
                             <div class="info-title">使用说明</div>
                             <div class="format-info-grid">
-                                <div class="format-info-item"><span class="format">波形</span><span class="desc">成功</span></div>
+                                <div class="format-info-item"><span class="format">波形</span><span class="desc">通过 HTTP 流式加载</span></div>
                                 <div class="format-info-item"><span class="format">导出</span><span class="desc">文件会先保存到临时目录，再交给 FFmpeg</span></div>
                                 <div class="format-info-item"><span class="format">建议</span><span class="desc">批量处理时手动选择输出目录</span></div>
                                 <div class="format-info-item"><span class="format">音量</span><span class="desc">当前版本为整体音量调整</span></div>
@@ -246,11 +255,23 @@
         var file = currentFiles[currentPreviewIndex];
         var volume = ensureFileVolume(file);
 
-        syncVolumeControls(volume);
+        // 检查是否启用批量同步
+        var batchSync = document.getElementById('batchSyncVolume');
+        var isBatchSync = batchSync ? batchSync.checked : true;
 
-        if (file && file.blobFile) {
-            await loadPreviewBlob(file.blobFile, logContainer, file.name);
-        } else if (file && file.path) {
+        if (isBatchSync) {
+            // 批量同步模式：切换时同步所有文件音量
+            currentVolume = volume;
+            currentFiles.forEach(function(f) {
+                f.volume = volume;
+            });
+            updateFileList();
+        } else {
+            // 单文件模式
+            syncVolumeControls(volume);
+        }
+
+        if (file && file.path) {
             await loadPreviewFromPath(file, logContainer);
         } else {
             var status = document.getElementById('waveformStatus');
@@ -306,7 +327,6 @@
         children.forEach(function(child) {
             if (!child) return;
 
-            // 这些是控制层，不能参与波形缩放，否则会被挤压/变形
             if (child.id === 'volumeEnvelopeOverlay') return;
             if (child.id === 'prevWaveBtn') return;
             if (child.id === 'nextWaveBtn') return;
@@ -319,7 +339,6 @@
                 if (child.classList.contains('volume-envelope-overlay')) return;
             }
 
-            // 只缩放 WaveSurfer 真实渲染层
             child.classList.add('waveform-render-layer');
             child.style.transform = 'scaleY(' + scale + ')';
             child.style.transformOrigin = 'center center';
@@ -337,7 +356,24 @@
         if (volumePercent) volumePercent.textContent = currentVolume;
 
         var file = getCurrentPreviewFile();
-        if (file) file.volume = currentVolume;
+        
+        // 检查是否启用批量同步
+        var batchSync = document.getElementById('batchSyncVolume');
+        var isBatchSync = batchSync ? batchSync.checked : true;
+
+        if (file) {
+            file.volume = currentVolume;
+            
+            if (isBatchSync) {
+                // 批量同步模式：所有文件都使用相同音量
+                currentFiles.forEach(function(f) {
+                    if (f !== file) {
+                        f.volume = currentVolume;
+                    }
+                });
+                updateFileList();
+            }
+        }
 
         updateEnvelopeLine();
         applyPreviewVolume();
@@ -425,12 +461,59 @@
         function handleDrag(event) {
             if (!dragging) return;
             event.preventDefault();
-            syncVolumeControls(yToVolume(event.clientY, overlay));
+            var newVolume = yToVolume(event.clientY, overlay);
+            
+            // 检查是否启用批量同步
+            var batchSync = document.getElementById('batchSyncVolume');
+            var isBatchSync = batchSync ? batchSync.checked : true;
+            
+            if (isBatchSync) {
+                // 批量同步：所有文件都用新音量
+                currentFiles.forEach(function(file) {
+                    file.volume = newVolume;
+                });
+                currentVolume = newVolume;
+                updateEnvelopeLine();
+                applyPreviewVolume();
+                updateWaveformVisualGain();
+                updateFileList();
+                updateWaveNavigationUI();
+                
+                var volumeSlider = document.getElementById('volumeSlider');
+                var volumePercent = document.getElementById('volumePercent');
+                if (volumeSlider) volumeSlider.value = newVolume;
+                if (volumePercent) volumePercent.textContent = newVolume;
+            } else {
+                syncVolumeControls(newVolume);
+            }
         }
 
         overlay.addEventListener('mousedown', function(event) {
             dragging = true;
-            syncVolumeControls(yToVolume(event.clientY, overlay));
+            var newVolume = yToVolume(event.clientY, overlay);
+            
+            var batchSync = document.getElementById('batchSyncVolume');
+            var isBatchSync = batchSync ? batchSync.checked : true;
+            
+            if (isBatchSync) {
+                currentFiles.forEach(function(file) {
+                    file.volume = newVolume;
+                });
+                currentVolume = newVolume;
+                updateEnvelopeLine();
+                applyPreviewVolume();
+                updateWaveformVisualGain();
+                updateFileList();
+                updateWaveNavigationUI();
+                
+                var volumeSlider = document.getElementById('volumeSlider');
+                var volumePercent = document.getElementById('volumePercent');
+                if (volumeSlider) volumeSlider.value = newVolume;
+                if (volumePercent) volumePercent.textContent = newVolume;
+            } else {
+                syncVolumeControls(newVolume);
+            }
+            
             document.addEventListener('mousemove', handleDrag);
             document.addEventListener('mouseup', function stopDrag() {
                 dragging = false;
@@ -470,20 +553,27 @@
         dot.title = currentVolume + '%';
     }
 
+    // ========== 初始化 WaveSurfer（优化版） ==========
     function initWaveSurfer(logContainer) {
         var waveformBox = document.getElementById('waveform');
-        if (!waveformBox) return null;
+        if (!waveformBox) {
+            return null;
+        }
 
+        // 彻底销毁旧的 WaveSurfer 实例
         if (wavesurfer) {
-            try { wavesurfer.destroy(); } catch (e) {}
+            try {
+                wavesurfer.pause();
+                wavesurfer.unAll();
+                wavesurfer.destroy();
+            } catch(e) {}
             wavesurfer = null;
         }
 
         waveformBox.innerHTML = '';
 
         if (typeof WaveSurfer === 'undefined') {
-            waveformBox.innerHTML = '<div class="waveform-empty">未检测到 WaveSurfer，请检查 index.html 引入顺序</div>';
-            addTerminalLog(logContainer, '未检测到 WaveSurfer，请先在 index.html 中引入 wavesurfer.min.js', 'error');
+            waveformBox.innerHTML = '<div class="waveform-empty">WaveSurfer 未加载</div>';
             return null;
         }
 
@@ -497,7 +587,8 @@
             barWidth: 2,
             barGap: 1,
             barRadius: 2,
-            normalize: true
+            normalize: false,
+            minPxPerSec: 1
         });
 
         ensureWaveformEnvelopeOverlay();
@@ -507,112 +598,75 @@
 
         var playBtn = document.getElementById('playPauseWaveBtn');
         var status = document.getElementById('waveformStatus');
-        var currentTimeEl = document.getElementById('waveCurrentTime');
         var durationEl = document.getElementById('waveDuration');
 
         wavesurfer.on('ready', function() {
-            if (playBtn) playBtn.disabled = false;
-            if (durationEl) durationEl.textContent = formatTime(wavesurfer.getDuration());
-            if (status && previewFileObject) status.textContent = '已加载波形：' + previewFileObject.name;
-            addTerminalLog(logContainer, '波形加载完成', 'success');
-        });
-
-        wavesurfer.on('timeupdate', function(time) {
-            if (currentTimeEl) currentTimeEl.textContent = formatTime(time);
+            if (playBtn) {
+                playBtn.disabled = false;
+            }
+            if (durationEl) {
+                durationEl.textContent = formatTime(wavesurfer.getDuration());
+            }
+            if (status && previewFileObject) {
+                status.textContent = "已加载波形：" + previewFileObject.name;
+            }
+            addTerminalLog(logContainer, "波形加载完成", "success");
         });
 
         wavesurfer.on('error', function(err) {
-            addTerminalLog(logContainer, '波形加载失败: ' + err, 'error');
-            if (status) status.textContent = '波形加载失败';
+            addTerminalLog(logContainer, "波形加载失败：" + err, "error");
+            if (status) {
+                status.textContent = "波形加载失败";
+            }
         });
 
         return wavesurfer;
     }
 
-    async function saveFrontendFileToTemp(file, logContainer) {
-        if (!window.go || !window.go.main || !window.go.main.App || !window.go.main.App.SaveTempFile) {
-            throw new Error('Wails SaveTempFile 不可用');
-        }
-        var buffer = await file.arrayBuffer();
-        var bytes = Array.from(new Uint8Array(buffer));
-        return await window.go.main.App.SaveTempFile(file.name, bytes);
-    }
-
-    function guessAudioMime(name) {
-        var ext = getExt(name);
-        var map = {
-            mp3: 'audio/mpeg',
-            wav: 'audio/wav',
-            ogg: 'audio/ogg',
-            flac: 'audio/flac',
-            aac: 'audio/aac',
-            m4a: 'audio/mp4',
-            wma: 'audio/x-ms-wma',
-            opus: 'audio/opus'
-        };
-        return map[ext] || 'audio/*';
-    }
-
-    function base64ToBlob(base64, mimeType) {
-        var binary = atob(base64);
-        var len = binary.length;
-        var bytes = new Uint8Array(len);
-
-        for (var i = 0; i < len; i++) {
-            bytes[i] = binary.charCodeAt(i);
-        }
-
-        return new Blob([bytes], {
-            type: mimeType || 'audio/*'
-        });
-    }
-
+    // ========== 通过 HTTP 流加载音频（Go 预览服务器） ==========
     async function loadPreviewFromPath(file, logContainer) {
-        if (!file || !file.path) return;
-
-        if (!window.go || !window.go.main || !window.go.main.App || !window.go.main.App.ReadFileAsBase64) {
-            addTerminalLog(logContainer, '当前后端不支持路径波形预览，请更新 app.go', 'error');
+        if (!file || !file.path) {
             return;
         }
 
         var status = document.getElementById('waveformStatus');
         var playBtn = document.getElementById('playPauseWaveBtn');
 
-        if (playBtn) playBtn.disabled = true;
-        if (status) status.textContent = '正在读取本地文件：' + file.name;
+        if (playBtn) {
+            playBtn.disabled = true;
+        }
+
+        if (status) {
+            status.textContent = "正在加载：" + file.name;
+        }
 
         try {
-            var result = await window.go.main.App.ReadFileAsBase64(file.path);
-
-            if (!result || !result.success) {
-                throw new Error(result && result.error ? result.error : '读取文件失败');
+            var ws = wavesurfer || initWaveSurfer(logContainer);
+            if (!ws) {
+                return;
             }
 
-            var blob = base64ToBlob(result.output, guessAudioMime(file.name));
-            file.blobFile = blob;
+            // 获取预览端口
+            var port = await window.go.main.App.GetPreviewPort();
+            if (!port) {
+                throw new Error('无法获取预览端口');
+            }
 
-            await loadPreviewBlob(blob, logContainer, file.name);
+            // 构建 HTTP URL
+            var url = "http://127.0.0.1:" + port + "/preview?path=" + encodeURIComponent(file.path);
+
+            console.log('🎵 加载音频:', url);
+
+            previewFileObject = file;
+
+            await ws.load(url);
+
         } catch (error) {
-            addTerminalLog(logContainer, '路径波形预览失败: ' + error.message, 'error');
-            if (status) status.textContent = '路径波形预览失败：' + file.name;
-        }
-    }
-
-    async function loadPreviewBlob(file, logContainer, displayName) {
-        previewFileObject = file;
-        var status = document.getElementById('waveformStatus');
-        var playBtn = document.getElementById('playPauseWaveBtn');
-        if (playBtn) playBtn.disabled = true;
-        if (status) status.textContent = '正在解析波形：' + (displayName || file.name);
-
-        var ws = wavesurfer || initWaveSurfer(logContainer);
-        if (!ws) return;
-
-        try {
-            await ws.loadBlob(file);
-        } catch (error) {
-            addTerminalLog(logContainer, '波形加载失败: ' + error.message, 'error');
-            if (status) status.textContent = '波形加载失败';
+            console.error('波形加载失败:', error);
+            addTerminalLog(logContainer, "路径波形预览失败：" + error.message, "error");
+            if (status) {
+                status.textContent = "路径波形预览失败：" + file.name;
+            }
         }
 
         updateWaveNavigationUI();
@@ -723,6 +777,7 @@
         var totalFileProgressSpan = document.getElementById('totalFileProgress');
         var logContainer = document.getElementById('volumeLogArea');
         var playPauseWaveBtn = document.getElementById('playPauseWaveBtn');
+        var batchSyncCheckbox = document.getElementById('batchSyncVolume');
 
         if (!selectFilesBtn) {
             console.error('DOM元素未找到');
@@ -734,14 +789,73 @@
         bindWaveNavigationButtons();
         syncVolumeControls(100);
 
+        // ========== 批量同步开关 ==========
+        if (batchSyncCheckbox) {
+            batchSyncCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    addTerminalLog(logContainer, '🔗 已开启批量同步调节：拖动音量将应用到所有文件', 'info');
+                    var currentVol = currentVolume;
+                    currentFiles.forEach(function(file) {
+                        file.volume = currentVol;
+                    });
+                    updateFileList();
+                    updateWaveNavigationUI();
+                } else {
+                    addTerminalLog(logContainer, '🔓 已关闭批量同步调节：每个文件独立调节音量', 'info');
+                    var file = getCurrentPreviewFile();
+                    if (file) {
+                        syncVolumeControls(file.volume);
+                    }
+                }
+            });
+        }
+
+        // ========== 音量滑块 - 支持批量同步 ==========
         volumeSlider.addEventListener('input', function(e) {
-            syncVolumeControls(e.target.value);
+            var newVolume = parseInt(e.target.value, 10);
+            var batchSync = document.getElementById('batchSyncVolume');
+            var isBatchSync = batchSync ? batchSync.checked : true;
+            
+            if (isBatchSync) {
+                // 批量同步模式：所有文件音量都设为相同值
+                currentFiles.forEach(function(file) {
+                    file.volume = newVolume;
+                });
+                currentVolume = newVolume;
+                updateEnvelopeLine();
+                applyPreviewVolume();
+                updateWaveformVisualGain();
+                updateFileList();
+                updateWaveNavigationUI();
+                if (volumePercent) volumePercent.textContent = newVolume;
+            } else {
+                // 单文件模式
+                syncVolumeControls(newVolume);
+            }
         });
 
+        // ========== 预设音量按钮 - 支持批量同步 ==========
         volumePresetBtns.forEach(function(btn) {
             btn.addEventListener('click', function() {
                 var vol = parseInt(this.dataset.volume, 10);
-                syncVolumeControls(vol);
+                var batchSync = document.getElementById('batchSyncVolume');
+                var isBatchSync = batchSync ? batchSync.checked : true;
+                
+                if (isBatchSync) {
+                    currentFiles.forEach(function(file) {
+                        file.volume = vol;
+                    });
+                    currentVolume = vol;
+                    if (volumeSlider) volumeSlider.value = vol;
+                    if (volumePercent) volumePercent.textContent = vol;
+                    updateEnvelopeLine();
+                    applyPreviewVolume();
+                    updateWaveformVisualGain();
+                    updateFileList();
+                    updateWaveNavigationUI();
+                } else {
+                    syncVolumeControls(vol);
+                }
             });
         });
 
@@ -751,6 +865,7 @@
             });
         }
 
+        // ========== 选择文件 ==========
         selectFilesBtn.addEventListener('click', function() {
             if (nativeFileInput) nativeFileInput.click();
         });
@@ -770,15 +885,17 @@
                 }
 
                 try {
-                    var saved = await saveFrontendFileToTemp(f, logContainer);
+                    // 保存到临时目录
+                    var buffer = await f.arrayBuffer();
+                    var bytes = Array.from(new Uint8Array(buffer));
+                    var saved = await window.go.main.App.SaveTempFile(f.name, bytes);
                     if (saved && saved.success) {
                         currentFiles.push({
                             name: saved.name || f.name,
                             path: saved.path,
                             size: saved.size || f.size,
-                            blobFile: f,
                             fromTemp: true,
-                            volume: 100
+                            volume: currentVolume
                         });
                         var newIndex = currentFiles.length - 1;
                         addedCount++;
@@ -798,6 +915,7 @@
             nativeFileInput.value = '';
         });
 
+        // ========== 选择文件夹 ==========
         selectFolderBtn.addEventListener('click', async function() {
             try {
                 if (!window.go || !window.go.main || !window.go.main.App) {
@@ -808,19 +926,34 @@
                 var result = await window.go.main.App.SelectFolder();
                 if (result && result.success && result.files) {
                     var addedCount = 0;
+                    var batchSync = document.getElementById('batchSyncVolume');
+                    var isBatchSync = batchSync ? batchSync.checked : true;
+                    var syncVol = isBatchSync ? currentVolume : 100;
+                    
                     for (var i = 0; i < result.files.length; i++) {
                         var file = result.files[i];
                         if (isAudioName(file.name)) {
-                            file.volume = 100;
-                            currentFiles.push(file);
-                            if (currentPreviewIndex === -1) currentPreviewIndex = currentFiles.length - 1;
+                            currentFiles.push({
+                                name: file.name,
+                                path: file.path,
+                                size: file.size || 0,
+                                volume: syncVol,
+                                fromTemp: false
+                            });
+                            if (currentPreviewIndex === -1) {
+                                currentPreviewIndex = currentFiles.length - 1;
+                            }
                             addedCount++;
                         }
                     }
-                    if (currentPreviewIndex >= 0) {
-                        syncVolumeControls(ensureFileVolume(currentFiles[currentPreviewIndex]));
+                    
+                    if (currentPreviewIndex >= 0 && currentPreviewIndex < currentFiles.length) {
+                        var vol = ensureFileVolume(currentFiles[currentPreviewIndex]);
+                        currentVolume = vol;
+                        syncVolumeControls(vol);
                         await switchPreviewTo(currentPreviewIndex, logContainer);
                     }
+                    
                     updateWaveNavigationUI();
                     updateFileList();
                     addTerminalLog(logContainer, '从文件夹中添加了 ' + addedCount + ' 个音频文件', 'info');
@@ -831,6 +964,7 @@
             }
         });
 
+        // ========== 清空列表 ==========
         clearAllBtn.addEventListener('click', function() {
             currentFiles = [];
             currentPreviewIndex = -1;
@@ -842,6 +976,7 @@
             addTerminalLog(logContainer, '已清空文件列表', 'info');
         });
 
+        // ========== 选择输出目录 ==========
         selectOutputDirBtn.addEventListener('click', async function() {
             try {
                 var result = await window.go.main.App.SelectOutputDir();
@@ -854,6 +989,7 @@
             }
         });
 
+        // ========== 开始批量处理 ==========
         startVolumeBtn.addEventListener('click', async function() {
             if (currentFiles.length === 0) {
                 addTerminalLog(logContainer, '请先选择音频文件', 'warning');
@@ -913,12 +1049,16 @@
                 try {
                     addTerminalLog(logContainer, '  音量: ' + fileVolume + '%', 'info');
                     var result = await window.go.main.App.AdjustVolume(file.path, outputPath, fileVolume, outFormat);
-                    if (result && result.success) {
+                    
+                    // 兼容大小写 Success/success
+                    var isSuccess = result && (result.Success === true || result.success === true);
+                    if (isSuccess) {
                         successCount++;
                         addTerminalLog(logContainer, '  [成功] ' + outputPath, 'success');
                     } else {
                         failCount++;
-                        addTerminalLog(logContainer, '  [失败] ' + (result && result.error ? result.error : '未知错误'), 'error');
+                        var errMsg = result && (result.Error || result.error);
+                        addTerminalLog(logContainer, '  [失败] ' + (errMsg ? errMsg : '未知错误'), 'error');
                     }
                 } catch (error) {
                     failCount++;

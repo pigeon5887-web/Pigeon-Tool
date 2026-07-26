@@ -558,12 +558,15 @@
                 addTerminalLog(logContainer, '[任务] ' + file.name + ' -> ' + outName, 'info');
                 try {
                     const result = await window.go.main.App.ConvertVideo(file.path, outPath, targetFormat, quality, size);
-                    if (result && result.success) {
+                    // 兼容大小写 Success/success
+                    var isSuccess = result && (result.Success === true || result.success === true);
+                    if (isSuccess) {
                         successCount++;
                         addTerminalLog(logContainer, '[成功] ' + outPath, 'success');
                     } else {
                         failCount++;
-                        addTerminalLog(logContainer, '[失败] ' + file.name + ': ' + (result?.error || '未知错误'), 'error');
+                        var errMsg = result && (result.Error || result.error);
+                        addTerminalLog(logContainer, '[失败] ' + file.name + ': ' + (errMsg || '未知错误'), 'error');
                     }
                 } catch (err) {
                     failCount++;

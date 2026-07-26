@@ -18,16 +18,24 @@ export function DeleteTempFile(arg1) {
   return window['go']['main']['App']['DeleteTempFile'](arg1);
 }
 
+export function GenerateQRCode(arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8) {
+  return window['go']['main']['App']['GenerateQRCode'](arg1, arg2, arg3, arg4, arg5, arg6, arg7, arg8);
+}
+
+export function GetAudioInfo(arg1) {
+  return window['go']['main']['App']['GetAudioInfo'](arg1);
+}
+
 export function GetFileInfo(arg1) {
   return window['go']['main']['App']['GetFileInfo'](arg1);
 }
 
-export function MergeVideoAudio(arg1, arg2, arg3, arg4, arg5, arg6) {
-  return window['go']['main']['App']['MergeVideoAudio'](arg1, arg2, arg3, arg4, arg5, arg6);
+export function GetPreviewPort() {
+  return window['go']['main']['App']['GetPreviewPort']();
 }
 
-export function ReadFileAsBase64(arg1) {
-  return window['go']['main']['App']['ReadFileAsBase64'](arg1);
+export function MergeVideoAudio(arg1, arg2, arg3, arg4, arg5, arg6) {
+  return window['go']['main']['App']['MergeVideoAudio'](arg1, arg2, arg3, arg4, arg5, arg6);
 }
 
 export function SaveTempFile(arg1, arg2) {

@@ -1,11 +1,13 @@
+// app.go
 package main
 
 import (
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -17,13 +19,15 @@ import (
 )
 
 type App struct {
-	ctx        context.Context
-	baseDir    string
-	runtimeDir string
+	ctx           context.Context
+	baseDir       string
+	runtimeDir    string
+	previewServer *http.Server
+	previewPort   int
 }
 
 type TaskResult struct {
-	Success bool   `json:"success"`
+	Success bool   `json:"Success"`
 	Output  string `json:"output,omitempty"`
 	Error   string `json:"error,omitempty"`
 }
@@ -70,8 +74,10 @@ func (a *App) Startup(ctx context.Context) {
 	}
 
 	fmt.Println("工作目录:", a.baseDir)
-
 	a.extractEmbeddedRuntime()
+
+	// 启动音频预览 HTTP 服务器
+	go a.startPreviewServer()
 }
 
 func (a *App) extractEmbeddedRuntime() {
@@ -110,7 +116,84 @@ func (a *App) extractEmbeddedRuntime() {
 	fmt.Println("运行文件释放目录:", a.runtimeDir)
 }
 
-// 获取Python脚本路径
+// ========== 音频预览 HTTP 服务器 ==========
+
+func (a *App) startPreviewServer() {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("/preview", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Query().Get("path")
+
+		if path == "" {
+			http.Error(w, "missing path", 400)
+			return
+		}
+
+		file, err := os.Open(path)
+		if err != nil {
+			http.Error(w, err.Error(), 404)
+			return
+		}
+		defer file.Close()
+
+		stat, _ := file.Stat()
+
+		// 设置正确的 Content-Type
+		ext := strings.ToLower(filepath.Ext(path))
+		contentType := "audio/mpeg"
+		switch ext {
+		case ".mp3":
+			contentType = "audio/mpeg"
+		case ".wav":
+			contentType = "audio/wav"
+		case ".ogg":
+			contentType = "audio/ogg"
+		case ".flac":
+			contentType = "audio/flac"
+		case ".aac", ".m4a":
+			contentType = "audio/mp4"
+		case ".opus":
+			contentType = "audio/opus"
+		case ".wma":
+			contentType = "audio/x-ms-wma"
+		default:
+			contentType = "audio/mpeg"
+		}
+		w.Header().Set("Content-Type", contentType)
+
+		// 允许跨域（Wails 内部使用）
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+
+		http.ServeContent(w, r, filepath.Base(path), stat.ModTime(), file)
+	})
+
+	server := &http.Server{
+		Addr:    "127.0.0.1:0",
+		Handler: mux,
+	}
+
+	ln, err := net.Listen("tcp", server.Addr)
+	if err != nil {
+		fmt.Println("预览服务器启动失败:", err)
+		return
+	}
+
+	a.previewPort = ln.Addr().(*net.TCPAddr).Port
+	a.previewServer = server
+
+	fmt.Println("🎵 音频预览端口:", a.previewPort)
+
+	if err := server.Serve(ln); err != nil && err != http.ErrServerClosed {
+		fmt.Println("预览服务器错误:", err)
+	}
+}
+
+// ========== 获取预览端口 ==========
+
+func (a *App) GetPreviewPort() int {
+	return a.previewPort
+}
+
 func (a *App) getPythonScriptPath() string {
 	possiblePaths := []string{
 		filepath.Join(a.runtimeDir, "python", "main.py"),
@@ -136,7 +219,6 @@ func (a *App) getPythonScriptPath() string {
 	return "python/main.py"
 }
 
-// 获取FFmpeg路径
 func (a *App) getFFmpegPath() string {
 	possiblePaths := []string{
 		filepath.Join(a.runtimeDir, "ffmpeg.exe"),
@@ -164,7 +246,6 @@ func (a *App) getFFmpegPath() string {
 	return "ffmpeg"
 }
 
-// 执行Python任务（使用临时文件，UTF-8编码）
 func (a *App) executePythonTask(action string, data map[string]interface{}) (*TaskResult, error) {
 	data["ffmpeg_path"] = a.getFFmpegPath()
 
@@ -179,7 +260,8 @@ func (a *App) executePythonTask(action string, data map[string]interface{}) (*Ta
 	}
 
 	tempDir := os.TempDir()
-	paramsFile := filepath.Join(tempDir, fmt.Sprintf("wails_task_%s_%d.json", action, os.Getpid()))
+	timestamp := time.Now().UnixNano()
+	paramsFile := filepath.Join(tempDir, fmt.Sprintf("wails_task_%s_%d_%d.json", action, os.Getpid(), timestamp))
 
 	err = os.WriteFile(paramsFile, jsonData, 0644)
 	if err != nil {
@@ -187,7 +269,11 @@ func (a *App) executePythonTask(action string, data map[string]interface{}) (*Ta
 	}
 	defer os.Remove(paramsFile)
 
+	fmt.Printf("📝 参数文件: %s\n", paramsFile)
+	fmt.Printf("📝 参数内容 (前200字符): %s\n", string(jsonData)[:min(len(string(jsonData)), 200)])
+
 	scriptPath := a.getPythonScriptPath()
+	fmt.Printf("📝 Python脚本: %s\n", scriptPath)
 
 	cmd := exec.Command("python", scriptPath, paramsFile)
 	cmd.SysProcAttr = &syscall.SysProcAttr{
@@ -195,7 +281,11 @@ func (a *App) executePythonTask(action string, data map[string]interface{}) (*Ta
 	}
 
 	output, err := cmd.CombinedOutput()
+
+	fmt.Printf("📝 Python原始输出: %s\n", string(output))
+
 	if err != nil {
+		fmt.Printf("❌ Python执行错误: %v\n", err)
 		return &TaskResult{
 			Success: false,
 			Error:   fmt.Sprintf("Python执行失败: %v\n输出: %s", err, string(output)),
@@ -204,18 +294,21 @@ func (a *App) executePythonTask(action string, data map[string]interface{}) (*Ta
 
 	var result TaskResult
 	if err := json.Unmarshal(output, &result); err != nil {
+		fmt.Printf("❌ JSON解析失败: %v\n", err)
+		fmt.Printf("原始输出: %s\n", string(output))
 		return &TaskResult{
-			Success: true,
-			Output:  string(output),
+			Success: false,
+			Error:   fmt.Sprintf("JSON解析失败: %v\n原始输出: %s", err, string(output)),
 		}, nil
 	}
+
+	fmt.Printf("✅ 解析成功: Success=%v, Output长度=%d, Error=%s\n", result.Success, len(result.Output), result.Error)
 
 	return &result, nil
 }
 
 // ========== 文件选择对话框 ==========
 
-// SelectFile 选择单个文件
 func (a *App) SelectFile() (*FileInfo, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "选择文件",
@@ -248,7 +341,6 @@ func (a *App) SelectFile() (*FileInfo, error) {
 	}, nil
 }
 
-// SelectFiles 选择文件（支持多选）
 func (a *App) SelectFiles() (*MultipleFilesResult, error) {
 	paths, err := runtime.OpenMultipleFilesDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "选择媒体文件",
@@ -292,7 +384,6 @@ func (a *App) SelectFiles() (*MultipleFilesResult, error) {
 	}, nil
 }
 
-// SelectFolder 选择文件夹，返回文件夹中所有媒体文件
 func (a *App) SelectFolder() (*MultipleFilesResult, error) {
 	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "选择包含媒体文件的文件夹",
@@ -347,7 +438,6 @@ func (a *App) SelectFolder() (*MultipleFilesResult, error) {
 	}, nil
 }
 
-// SelectOutputDir 选择输出目录
 func (a *App) SelectOutputDir() (*DirResult, error) {
 	path, err := runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: "选择输出目录",
@@ -367,7 +457,6 @@ func (a *App) SelectOutputDir() (*DirResult, error) {
 	}, nil
 }
 
-// SelectFileWithFilter 带过滤器的文件选择
 func (a *App) SelectFileWithFilter(title string, filterPattern string, filterName string) (*FileInfo, error) {
 	path, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
 		Title: title,
@@ -406,7 +495,6 @@ func (a *App) SelectFileWithFilter(title string, filterPattern string, filterNam
 
 // ========== 拖拽上传：保存临时文件 ==========
 
-// SaveTempFile 保存临时文件（用于拖拽上传）
 func (a *App) SaveTempFile(name string, data []byte) (*FileInfo, error) {
 	if name == "" {
 		return &FileInfo{Success: false, Error: "文件名不能为空"}, nil
@@ -434,7 +522,6 @@ func (a *App) SaveTempFile(name string, data []byte) (*FileInfo, error) {
 	}, nil
 }
 
-// DeleteTempFile 删除临时文件
 func (a *App) DeleteTempFile(filePath string) error {
 	if filePath == "" {
 		return nil
@@ -514,25 +601,18 @@ func (a *App) AdjustVolume(inputPath string, outputPath string, volume int, outp
 	return a.executePythonTask("volume", data)
 }
 
+// ========== 获取音频信息 ==========
 
-// ReadFileAsBase64 读取本地文件并返回 base64，用于前端生成波形预览
-func (a *App) ReadFileAsBase64(filePath string) (*TaskResult, error) {
+func (a *App) GetAudioInfo(filePath string) (*TaskResult, error) {
 	if filePath == "" {
 		return &TaskResult{Success: false, Error: "文件路径不能为空"}, nil
 	}
 
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return &TaskResult{
-			Success: false,
-			Error:   fmt.Sprintf("读取文件失败: %v", err),
-		}, nil
+	data := map[string]interface{}{
+		"input_path": filePath,
 	}
 
-	return &TaskResult{
-		Success: true,
-		Output:  base64.StdEncoding.EncodeToString(data),
-	}, nil
+	return a.executePythonTask("info", data)
 }
 
 // ========== 4. 辅助功能 ==========
@@ -568,4 +648,39 @@ func (a *App) CheckFFmpeg() (*TaskResult, error) {
 		Success: true,
 		Output:  string(output),
 	}, nil
+}
+
+// ========== 二维码生成 ==========
+
+func (a *App) GenerateQRCode(text string, size int, fgColor string, bgColor string, embedImage string, embedMode string, errorCorrection string, border int) (*TaskResult, error) {
+	if text == "" {
+		return &TaskResult{Success: false, Error: "文本内容不能为空"}, nil
+	}
+
+	if border == 0 {
+		border = 4
+	}
+
+	fmt.Printf("📝 收到二维码生成请求: text=%s, size=%d, fg=%s, bg=%s, mode=%s, border=%d, embedImage长度=%d\n",
+		text[:min(len(text), 50)], size, fgColor, bgColor, embedMode, border, len(embedImage))
+
+	data := map[string]interface{}{
+		"text":             text,
+		"size":             size,
+		"fg_color":         fgColor,
+		"bg_color":         bgColor,
+		"embed_image":      embedImage,
+		"embed_mode":       embedMode,
+		"error_correction": errorCorrection,
+		"border":           border,
+	}
+
+	return a.executePythonTask("qrcode", data)
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }

@@ -73,7 +73,7 @@ export namespace main {
 		}
 	}
 	export class TaskResult {
-	    success: boolean;
+	    Success: boolean;
 	    output?: string;
 	    error?: string;
 	
@@ -83,7 +83,7 @@ export namespace main {
 	
 	    constructor(source: any = {}) {
 	        if ('string' === typeof source) source = JSON.parse(source);
-	        this.success = source["success"];
+	        this.Success = source["Success"];
 	        this.output = source["output"];
 	        this.error = source["error"];
 	    }

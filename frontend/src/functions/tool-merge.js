@@ -413,7 +413,6 @@
             }, 500);
 
             try {
-                // ========== 修改为独立参数调用 ==========
                 const result = await window.go.main.App.MergeVideoAudio(
                     videoFile.path,
                     audioFile.path,
@@ -425,13 +424,16 @@
 
                 clearInterval(progressInterval);
 
-                if (result && result.success) {
+                // 兼容大小写 Success/success
+                var isSuccess = result && (result.Success === true || result.success === true);
+                if (isSuccess) {
                     progressBar.style.width = '100%';
                     addTerminalLog(logContainer, '[成功] 合并成功', 'success');
                     addTerminalLog(logContainer, '[输出] ' + outputPath, 'success');
                 } else {
                     progressBar.style.width = '0%';
-                    addTerminalLog(logContainer, '[失败] 合并失败: ' + (result?.error || '未知错误'), 'error');
+                    var errMsg = result && (result.Error || result.error);
+                    addTerminalLog(logContainer, '[失败] 合并失败: ' + (errMsg || '未知错误'), 'error');
                 }
             } catch (error) {
                 clearInterval(progressInterval);

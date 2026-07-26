@@ -14,10 +14,8 @@ def main():
 
     params_file = sys.argv[1]
 
-    # 读取 JSON 文件，处理 BOM
     try:
         with open(params_file, 'r', encoding='utf-8-sig') as f:
-            # utf-8-sig 会自动处理 BOM
             content = f.read()
             params = json.loads(content)
     except Exception as e:
@@ -28,7 +26,6 @@ def main():
     action = params.get('action')
     data = params.get('data', {})
 
-    # 添加当前目录到路径
     current_dir = os.path.dirname(os.path.abspath(__file__))
     sys.path.insert(0, current_dir)
 
@@ -45,6 +42,9 @@ def main():
         elif action == 'info':
             from modules.info import get_file_info
             result = get_file_info(data)
+        elif action == 'qrcode':
+            from modules.qrcode_gen import generate_qrcode
+            result = generate_qrcode(data)
         else:
             result = {"success": False, "error": f"未知操作: {action}"}
     except ImportError as e:
@@ -52,7 +52,11 @@ def main():
     except Exception as e:
         result = {"success": False, "error": f"执行失败: {str(e)}"}
 
-    print(json.dumps(result, ensure_ascii=False))
+    # ===== 只输出 JSON =====
+    try:
+        print(json.dumps(result, ensure_ascii=False))
+    except Exception as e:
+        print(json.dumps({"success": False, "error": f"序列化结果失败: {str(e)}"}, ensure_ascii=False))
 
 
 if __name__ == "__main__":
